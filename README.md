@@ -1,163 +1,167 @@
-# FLUX.2
+# FastFLUX2Klein
 
-**Frontier Visual Intelligence** — State-of-the-art image generation and editing from [Black Forest Labs](https://bfl.ai).
+OpenAI Images-compatible inference service for Black Forest Labs' FLUX.2 Klein models. This repository is a fork of [black-forest-labs/flux2](https://github.com/black-forest-labs/flux2); the upstream source, documentation, assets and license remain available here as `UPSTREAM_README.md`, `src/`, `scripts/`, `docs/`, and the original license files.
 
----
+The `service/` directory adds a batched FastAPI server, OpenAI SDK client, single- and multi-reference image editing, exact and approximate diffusion caches, performance benchmarks and tests. No model weights, API keys or generated outputs are included.
 
-<p align="center">
-<a href="https://docs.bfl.ai">API Docs</a> •
-<a href="https://huggingface.co/black-forest-labs">Hugging Face</a> •
-<a href="https://bfl.ai/blog">Blog</a>
-</p>
+## Features
 
-This repo contains minimal inference code to run image generation & editing with our FLUX.2 open-weight models.
+- `POST /v1/images/generations` and `POST /v1/images/edits` with the OpenAI Python SDK.
+- One or multiple reference images, with bounded image size and memory-aware batching.
+- BF16 inference, regional Transformer compilation, native SDPA, batched prompt encoding, prompt/reference caches and parallel output encoding.
+- `diffusion_cache="none"|"exact"|"taylorseer"`. `exact` is pixel-identical to `none` in tested runs. TaylorSeer predicts late residual blocks and changes image details; it is opt-in and reports whether predictions were used.
+- PNG, JPEG and WEBP output; square and non-square resolutions.
 
-## News
+The service package and setup below were validated on Python 3.10, PyTorch 2.6.0+cu124 and an NVIDIA A100 80GB with a 40GB process budget. Other CUDA GPUs may need a matching PyTorch wheel and different batch/memory settings.
 
-- **[15.01.2026]** Today, we release the FLUX.2 [klein] family of models, our fastest models yet. Sub-second generation on consumer GPUs. Read more about it in our [blog post](https://bfl.ai/blog/flux2-klein-towards-interactive-visual-intelligence).
-- **[25.11.2025]** We are releasing FLUX.2 [dev], a 32B parameter model for text-to-image generation, and image editing (single reference image and multiple reference images).
+## Environment
 
-## Model Overview
-
-| Name | Step-distilled | Guidance-distilled | Text-to-Image | Image Editing (Single reference) | Image Editing (Multi-reference) | License |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| [FLUX.2 [klein] 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) | ✅ | ✅ | ✅ | ✅ | ✅ | [apache-2.0](https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md) |
-| [FLUX.2 [klein] 9B](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B) | ✅ | ✅ | ✅ | ✅ | ✅ | [FLUX Non-Commercial License](model_licenses/LICENSE-FLUX-NON-COMMERICAL) |
-| [FLUX.2 [klein] 9B KV](https://huggingface.co/black-forest-labs/FLUX.2-klein-9b-kv) | ✅ | ✅ | ✅ | ✅ | ✅ | [FLUX Non-Commercial License](model_licenses/LICENSE-FLUX-NON-COMMERICAL) |
-| [FLUX.2 [klein] 4B Base](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-4B) | ❌ | ❌ | ✅ | ✅ | ✅ | [apache-2.0](https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md) |
-| [FLUX.2 [klein] 9B Base](https://huggingface.co/black-forest-labs/FLUX.2-klein-base-9B) | ❌ | ❌ | ✅ | ✅ | ✅ | [FLUX Non-Commercial License](model_licenses/LICENSE-FLUX-NON-COMMERICAL) |
-| [FLUX.2 [dev]](https://huggingface.co/black-forest-labs/FLUX.2-dev) | ❌ | ✅ | ✅ | ✅ | ✅ | [FLUX Non-Commercial License](model_licenses/LICENSE-FLUX-NON-COMMERICAL) |
-
-**All models support**: Text-to-Image ✅ | Single-ref Editing ✅ | Multi-ref Editing ✅
-
-## Which Model Should I Use?
-
-| Need | Recommended |
-|------|-------------|
-| Real-time apps, interactive workflows | [klein] 4B, 9B, or 9B KV (distilled) |
-| Consumer GPU (e.g. RTX 3090/4070) | [klein] 4B |
-| Fine-tuning, LoRA training | [klein] Base or FLUX.2 [dev] |
-| Maximum quality, no latency constraints | FLUX.2 [dev] |
-
-## `FLUX.2 [klein]`
-
-FLUX.2 [klein] is our fastest model family — generating and editing (multiple) images in under a second without sacrificing quality. Built for real-time applications, creative iteration, and deployment on consumer hardware.
-
-### Key Capabilities
-- **Sub-second inference** — Generate or edit images under a second on modern hardware
-- **Unified generation & editing** — Text-to-image, image editing, and multi-reference in one model
-- **Runs on consumer GPUs** — Klein 4B fits in ~8GB VRAM (RTX 3090/4070 and up)
-- **Apache 2.0 on 4B** — Open-source, fine-tuning, and customization
-
-### Performance
-
-Klein models define the Pareto frontier for quality vs. latency and VRAM across text-to-image, single-reference editing, and multi-reference generation:
-
-<p align="center">
-<img src="assets/klein_benchmark.jpg" alt="FLUX.2 [klein] vs Baselines — Elo vs Latency and VRAM" width="800"/>
-</p>
-<sub>Higher Elo + Lower Latency/VRAM = Better.</sub>
-
-### The Klein Family
-
-| Model | Best For |
-|:---|:---|
-| **[klein] 4B** | Maximum speed, consumer hardware, edge deployment |
-| **[klein] 9B** | High quality text-to-image; for image editing, 9B KV is faster at equal quality |
-| **[klein] 9B KV** | Best quality-to-latency ratio, faster than 4B for multi-reference image editing via [KV caching](docs/flux2_klein_kv_cache.md) |
-| **[klein] 4B Base** | Fine-tuning on limited hardware, full customization |
-| **[klein] 9B Base** | Research, LoRA training, maximum output diversity |
-
-**Distilled vs Base:**
-- Use **Distilled** (4-step) for production apps and real-time generation
-- Use **Base** (50-step) for fine-tuning, LoRA training, and maximum flexibility
-
-**Licensing:** 4B models are [Apache 2.0](https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md). 9B models use the [FLUX.2-dev Non-Commercial License](model_licenses/LICENSE-FLUX-DEV).
-
-### Text-to-image examples
-
-Example focused on realism 
-![t2i-klein-grid](assets/t2i_klein_realism.jpg)
-
-Example focused on output diversity
-![t2i-klein-others](assets/t2i_klein_others.jpg)
-
-### Editing examples
-
-![i2i-klein](assets/i2i_klein.jpg)
-
-## `FLUX.2 [dev]`
-
-`FLUX.2 [dev]` is a 32B parameter flow matching transformer model capable of generating and editing (multiple) images. The model is released under the [FLUX.2-dev Non-Commercial License](model_licenses/LICENSE-FLUX-DEV) and can be found [here](https://huggingface.co/black-forest-labs/FLUX.2-dev).
-
-Note that the below script for `FLUX.2 [dev]` needs considerable amount of VRAM (H100-equivalent GPU). We partnered with Hugging Face to make quantized versions that run on consumer hardware; below you can find instructions on how to run it on a RTX 4090 with a remote text encoder, for other quantization sizes and combinations, check the [diffusers quantization guide here](docs/flux2_dev_hf.md).
-
-### Text-to-image examples
-
-![t2i-grid](assets/teaser_generation.png)
-
-### Editing examples
-
-![edit-grid](assets/teaser_editing.png)
-
-### Prompt upsampling
-
-`FLUX.2 [dev]` benefits significantly from prompt upsampling. The inference script below offers the option to use both local prompt upsampling with the same model we use for text encoding ([`Mistral-Small-3.2-24B-Instruct-2506`](https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506)), or alternatively, use any model on [OpenRouter](https://openrouter.ai/) via an API call.
-
-See the [upsampling guide](docs/flux2_with_prompt_upsampling.md) for additional details and guidance on when to use upsampling.
-
-## `FLUX.2` autoencoder
-
-The FLUX.2 autoencoder has considerably improved over the [FLUX.1 autoencoder](https://huggingface.co/black-forest-labs/FLUX.1-dev/blob/main/ae.safetensors). The autoencoder is released under [Apache 2.0](https://huggingface.co/datasets/choosealicense/licenses/blob/main/markdown/apache-2.0.md) and can be found [here](https://huggingface.co/black-forest-labs/FLUX.2-dev/blob/main/ae.safetensors). For more information, see our [technical blogpost](https://bfl.ai/research/representation-comparison).
-
-## Local installation
-
-The inference code was tested on GB200 using CUDA 12.9 and Python 3.12.
+Install a current NVIDIA driver compatible with CUDA 12.4, Git, Python 3.10, and an NVIDIA GPU with enough free memory for the 9B model. The reference deployment used an A100 80GB shared with another workload and limited this service to 40GB. At least 40GB of free disk is recommended for model weights, compilation cache and generated files.
 
 ```bash
-python3.12 -m venv .venv
+git clone https://github.com/EurecaMoment/FastFLUX2Klein.git
+cd FastFLUX2Klein
+python3.10 -m venv .venv
 source .venv/bin/activate
-pip install -e . --extra-index-url https://download.pytorch.org/whl/cu129 --no-cache-dir
+python -m pip install --upgrade pip
+python -m pip install -r service/requirements.txt
 ```
 
-## Run the CLI
+The requirements pin the validated CUDA 12.4 PyTorch wheel and inference stack. For another CUDA version, edit the PyTorch wheel/index entries to match the installed driver and GPU before installing.
 
-Before running the CLI, you may download the weights from [here](https://huggingface.co/black-forest-labs/FLUX.2-dev) and set the following environment variables.
+### Download the model
+
+The 9B weights use the FLUX.2 model license and may require accepting its terms on Hugging Face before download. This repository does not redistribute weights.
 
 ```bash
-export FLUX2_MODEL_PATH="<flux2_path>"
-export AE_MODEL_PATH="<ae_path>"
-export KLEIN_4B_MODEL_PATH="<klein_4b_path>"
-export KLEIN_4B_BASE_MODEL_PATH="<klein_4b_base_path>"
-export KLEIN_9B_MODEL_PATH="<klein_9b_path>"
-export KLEIN_9B_KV_MODEL_PATH="<klein_9b_kv_path>"
-export KLEIN_9B_BASE_MODEL_PATH="<klein_9b_base_path>"
+hf auth login
+mkdir -p "$HOME/models/FLUX.2-klein-9B"
+hf download black-forest-labs/FLUX.2-klein-9B \
+  --local-dir "$HOME/models/FLUX.2-klein-9B"
 ```
 
-If you don't set the environment variables, the weights will be downloaded automatically.
-
-You can start an interactive session to do both text to image generation as well as editing (one or multiple) images with the following command:
+Set up local service configuration:
 
 ```bash
-PYTHONPATH=src python scripts/cli.py
+cp .env.example .env
+chmod 600 .env
 ```
 
-## Watermarking
+Edit `.env` and set an absolute `FLUX2_MODEL_PATH`, a long random `FLUX2KLEIN_API_KEY`, and `CUDA_VISIBLE_DEVICES` for the GPU assigned to this process. Do not commit `.env`. For example, use `openssl rand -hex 32` to create a key, then store the result in `.env`.
 
-We've added an option to embed invisible watermarks directly into the generated images
-via the [invisible watermark library](https://github.com/ShieldMnt/invisible-watermark).
+## Start
 
-Additionally, we are recommending implementing a solution to mark the metadata of your outputs, such as [C2PA](https://c2pa.org/)
+Start the server in the foreground; use Ctrl+C to stop it:
 
-## Citation
+```bash
+./service/run.sh serve
+```
 
-If you find the provided code or models useful for your research, consider citing them as:
+The first startup compiles and warms the supported batch shapes before marking `/health` ready. Subsequent starts reuse the local TorchInductor cache. Default address: `http://127.0.0.1:8036/v1`.
 
-```bib
-@misc{flux-2-2025,
-    author={Black Forest Labs},
-    title={{FLUX.2: Frontier Visual Intelligence}},
-    year={2025},
-    howpublished={\url{https://bfl.ai/blog/flux-2}},
+To make the service reachable from other machines, set `--host 0.0.0.0` and place it behind a trusted network or TLS reverse proxy. Keep the API key private; this service does not configure TLS itself.
+
+## OpenAI Python SDK
+
+```python
+import base64
+import os
+from pathlib import Path
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="http://127.0.0.1:8036/v1",
+    api_key=os.environ["FLUX2KLEIN_API_KEY"],
+    timeout=600,
+)
+
+# Text-to-image
+result = client.images.generate(
+    model="flux2klein",
+    prompt="A red ceramic teapot on a wooden table in soft daylight",
+    size="512x512",
+    response_format="b64_json",
+    extra_body={"seed": 42, "diffusion_cache": "exact"},
+)
+Path("generated.png").write_bytes(base64.b64decode(result.data[0].b64_json))
+
+# Single-reference edit
+with open("input.png", "rb") as image:
+    result = client.images.edit(
+        model="flux2klein",
+        image=image,
+        prompt="Change the teapot to cobalt blue. Preserve its shape and the table.",
+        size="512x512",
+        extra_body={"seed": 60, "diffusion_cache": "exact"},
+    )
+Path("edited.png").write_bytes(base64.b64decode(result.data[0].b64_json))
+
+# Multi-reference edit
+with open("teapot.png", "rb") as first, open("robot.png", "rb") as second:
+    result = client.images.edit(
+        model="flux2klein",
+        image=[first, second],
+        prompt="Place the robot from image 2 next to the teapot from image 1.",
+        size="512x512",
+        extra_body={"seed": 62, "diffusion_cache": "exact"},
+    )
+Path("combined.png").write_bytes(base64.b64decode(result.data[0].b64_json))
+```
+
+## Cache controls
+
+| Option | Default | Behavior |
+|---|---:|---|
+| `cache_prompt` | `true` | Reuses text features in a bounded CPU pinned-memory LRU. |
+| `cache_reference` | `true` | Reuses deterministic VAE latents for identical reference images. |
+| `diffusion_cache` | `exact` | `none` performs the regular calculation; `exact` memoizes invariant projections/position embeddings within a request; `taylorseer` additionally predicts selected late-block residuals. |
+| `cache_blocks` | `12` | Number of trailing single-stream blocks selected for Taylor prediction, 1–24. |
+| `cache_warmup_steps` | `2` | Full steps before prediction history is used. |
+| `cache_interval` | `2` | Refresh interval for approximate prediction. The final denoising step is always full. |
+
+Approximate example:
+
+```python
+extra_body={
+    "seed": 42,
+    "num_inference_steps": 4,
+    "diffusion_cache": "taylorseer",
+    "cache_blocks": 12,
 }
 ```
+
+With 4 steps and defaults, the service predicts selected blocks only during an intermediate step. `timings.predicted_blocks` and `timings.approximate` report actual use. A mode name alone does not guarantee that a prediction occurred.
+
+## Service API and limits
+
+- `POST /v1/images/generations`: OpenAI-shaped text-to-image request.
+- `POST /v1/images/edits`: multipart or JSON Base64/data-URL reference-image editing.
+- `GET /v1/models`: authenticated model list.
+- `GET /v1/files/{id}.{png|jpeg|webp}`: authenticated download for URL responses.
+- `GET /health`: readiness, active limits, caches, memory and startup-equivalence checks.
+
+Requests support `n=1..8`, `num_inference_steps=1..50`, 16-pixel-aligned dimensions from 256 to 1536, and up to 1,048,576 output pixels. A request can include up to 8 PNG/JPEG/WEBP references, each up to 16 MiB, with a combined resized area up to 2MP. Masks/inpainting and dynamic LoRA management are not implemented; unsupported fields return an error instead of being ignored.
+
+Default model-memory budget is 40 decimal GB. Initial batch limits are 16 for outputs up to 512x512 and 4 for larger outputs; available memory and reference context can reduce effective batch sizes. The GPU worker processes one compatible batch at a time; request queue capacity is not GPU parallelism.
+
+## CLI, benchmark and tests
+
+```bash
+./service/run.sh generate --size 512x512 --prompt 'A red teapot' --output /tmp/teapot.png
+./service/run.sh edit --image /tmp/teapot.png --prompt 'Make the teapot blue' --size 512x512 --output /tmp/blue.png
+./service/run.sh edit --image /tmp/teapot.png --image /tmp/robot.png --prompt 'Place both objects together' --size 512x512 --output /tmp/together.png
+./service/run.sh benchmark --concurrency 64 --requests 64 --size 512x512 --unique-prompts --output /tmp/bench.json
+./service/run.sh test
+./service/run.sh verify
+```
+
+The CPU contract suite tests the OpenAI-style HTTP schema without loading the model. The GPU integration suite requires a running local server and generates its own reference images. Benchmark prompts receive a per-run random namespace so cold-prompt results cannot silently hit an earlier run's cache.
+
+## Reference deployment result
+
+On an A100 80GB with a 40GB process budget, BF16 and 4 denoising steps, the validated deployment measured 2.38 images/s for 64 concurrent cached 512x512 requests and 2.14 images/s for 64 unique prompts. Eight concurrent 1024x1024 requests measured 0.69 images/s. These are one deployment's observations, not a hardware-wide guarantee. See `service/README.md` for the full report and measured tradeoffs.
+
+## Licensing and attribution
+
+This repository retains upstream FLUX.2 source and license files. The included 9B model weights are not redistributed and are subject to the separate FLUX.2 model license linked from the upstream model card. Check and accept the model terms before downloading or using the weights. See `LICENSE.md`, `model_licenses/`, and the [official FLUX.2 Klein 9B model card](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B).
+
