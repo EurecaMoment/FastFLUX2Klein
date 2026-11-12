@@ -54,4 +54,3 @@ The approximate TaylorSeer quality comparison in the reference run had pixel MAE
 The API supports up to 8 reference images and a total resized reference area up to 2MP. Output dimensions are multiples of 16, from 256 to 1536 per side, up to 1MP total. The initial batch limits are 16 for outputs up to 512x512 and 4 for larger outputs; reference context and available VRAM can reduce them. The queue admits up to 256 images by default, but one GPU worker executes one compatible batch at a time.
 
 Mask-based inpainting and dynamic LoRA management are not implemented. Unknown request parameters are rejected.
-

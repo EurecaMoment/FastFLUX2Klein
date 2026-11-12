@@ -164,4 +164,3 @@ On an A100 80GB with a 40GB process budget, BF16 and 4 denoising steps, the vali
 ## Licensing and attribution
 
 This repository retains upstream FLUX.2 source and license files. The included 9B model weights are not redistributed and are subject to the separate FLUX.2 model license linked from the upstream model card. Check and accept the model terms before downloading or using the weights. See `LICENSE.md`, `model_licenses/`, and the [official FLUX.2 Klein 9B model card](https://huggingface.co/black-forest-labs/FLUX.2-klein-9B).
-

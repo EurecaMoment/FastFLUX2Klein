@@ -66,4 +66,3 @@ async def main():
         print(json.dumps({k:v for k,v in summary.items() if k not in ("rows","health_before","health_after")},indent=2),flush=True)
 asyncio.run(main())
 
-

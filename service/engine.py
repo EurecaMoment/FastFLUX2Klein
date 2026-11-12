@@ -367,4 +367,3 @@ class Engine:
                         "queue_seconds":round(max(0,started-job.submitted),6)})
                 for image,job,hit in zip(images,jobs,hits)]
 
-

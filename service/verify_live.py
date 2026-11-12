@@ -122,4 +122,3 @@ check("service_healthy_after_tests",
       report["health_after"]["ready"] and not report["health_after"]["error"])
 (OUT / "verification.json").write_text(json.dumps(report, indent=2))
 print("VERIFICATION_COMPLETE", sum(row["passed"] for row in report["checks"]), flush=True)
-

@@ -14,4 +14,3 @@ pillow==11.3.0
 numpy==1.26.4
 openai==2.54.0
 httpx==0.28.1
-

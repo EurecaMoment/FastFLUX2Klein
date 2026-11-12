@@ -117,4 +117,3 @@ async def main():
     print(json.dumps({"passed":len(checks),"checks":checks},indent=2))
 asyncio.run(main())
 
-

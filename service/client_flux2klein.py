@@ -47,4 +47,3 @@ for i,item in enumerate(result.data):
     print("Saved:",str(path))
     print("Timings:",item.model_extra.get("timings"))
 
-

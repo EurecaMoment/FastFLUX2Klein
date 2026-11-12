@@ -16,4 +16,3 @@ def native_attention(query,key,value,attn_mask=None,dropout_p=0.0,is_causal=Fals
 
 def install():
     flux2.dispatch_attention_fn=native_attention
-
