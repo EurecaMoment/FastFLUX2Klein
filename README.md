@@ -16,34 +16,32 @@ The service package and setup below were validated on Python 3.10, PyTorch 2.6.0
 
 ## Environment
 
-Install a current NVIDIA driver compatible with CUDA 12.4, Git, Python 3.10, and an NVIDIA GPU with enough free memory for the 9B model. The reference deployment used an A100 80GB shared with another workload and limited this service to 40GB. At least 40GB of free disk is recommended for model weights, compilation cache and generated files.
+Install a current NVIDIA driver compatible with CUDA 12.4, Git, Conda, and an NVIDIA GPU with enough free memory for the 9B model. The reference deployment used an A100 80GB shared with another workload and limited this service to 40GB. At least 40GB of free disk is recommended for model weights, compilation cache and generated files.
 
 ```bash
 git clone https://github.com/EurecaMoment/FastFLUX2Klein.git
 cd FastFLUX2Klein
-python3.10 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r service/requirements.txt
+cp .env.example .env
+# Edit .env: set FLUX2_MODEL_PATH and FLUX2KLEIN_API_KEY.
+bash service/run.sh install
 ```
 
-The requirements pin the validated CUDA 12.4 PyTorch wheel and inference stack. For another CUDA version, edit the PyTorch wheel/index entries to match the installed driver and GPU before installing.
+`service/run.sh` creates the `flux2klein` Conda environment with Python 3.10 when it does not exist, then installs the pinned CUDA 12.4 PyTorch wheel and inference stack. Set `FLUX2KLEIN_CONDA_ENV` or `FLUX2KLEIN_CONDA_PREFIX` in `.env` to select another environment. The launcher calls `conda run`, so every command uses the selected environment without requiring shell-specific activation. For another CUDA version, edit the PyTorch wheel/index entries to match the installed driver and GPU before installing.
 
 ### Download the model
 
 The 9B weights use the FLUX.2 model license and may require accepting its terms on Hugging Face before download. This repository does not redistribute weights.
 
 ```bash
-hf auth login
+bash service/run.sh hf auth login
 mkdir -p "$HOME/models/FLUX.2-klein-9B"
-hf download black-forest-labs/FLUX.2-klein-9B \
+bash service/run.sh hf download black-forest-labs/FLUX.2-klein-9B \
   --local-dir "$HOME/models/FLUX.2-klein-9B"
 ```
 
-Set up local service configuration:
+Set up local service configuration before installation:
 
 ```bash
-cp .env.example .env
 chmod 600 .env
 ```
 
@@ -51,11 +49,13 @@ Edit `.env` and set an absolute `FLUX2_MODEL_PATH`, a long random `FLUX2KLEIN_AP
 
 ## Start
 
-Start the server in the foreground; use Ctrl+C to stop it:
+Start the server in the foreground with Bash; use Ctrl+C to stop it:
 
 ```bash
 ./service/run.sh serve
 ```
+
+The same launcher works from a login shell, a regular terminal, or a user-created Bash process. It only needs Bash, a working Conda installation, and the selected Conda environment.
 
 The first startup compiles and warms the supported batch shapes before marking `/health` ready. Subsequent starts reuse the local TorchInductor cache. Default address: `http://127.0.0.1:8036/v1`.
 

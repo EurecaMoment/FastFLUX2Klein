@@ -12,20 +12,20 @@ The files in this directory provide a standalone OpenAI Images-compatible API ar
 - `benchmark_v2.py`: HTTP throughput and latency benchmark with unique prompt namespaces.
 - `test_contract.py`: CPU API contract tests using a deterministic engine stub.
 - `verify_live.py`: real GPU generation, cache, and reference-edit integration checks.
-- `run.sh`: portable local environment and command entry point.
+- `run.sh`: Bash + Conda environment setup and command entry point.
 - `requirements.txt`: the versions validated by the reference deployment.
 
 ## Setup
 
-Use the setup and model access instructions in the repository root README. Create `.env` from `.env.example`, set the model directory and a private random API key, then install `service/requirements.txt` in the repository `.venv`.
+Use the setup and model access instructions in the repository root README. Create `.env` from `.env.example`, set the model directory and a private random API key, then run `bash service/run.sh install`. The script creates or reuses the configured Conda environment and installs `service/requirements.txt` with `conda run`.
 
 Start in the foreground:
 
 ```bash
-./service/run.sh serve
+bash service/run.sh serve
 ```
 
-The server requires a local model directory and `FLUX2KLEIN_API_KEY`. It does not download weights at runtime. Compilation and warm-up happen before readiness. Stop the foreground server with Ctrl+C.
+The server requires a local model directory and `FLUX2KLEIN_API_KEY`. It does not download weights at runtime. Compilation and warm-up happen before readiness. Stop the foreground server with Ctrl+C. The launcher uses only Bash and the configured Conda environment.
 
 ## Cache semantics
 
