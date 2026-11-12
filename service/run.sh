@@ -78,24 +78,20 @@ resolve_conda() {
   fi
 }
 
-conda_target_args() {
+run_in_env() {
   if [[ -n "$CONDA_ENV_PREFIX" ]]; then
-    printf '%s\n' --prefix "$CONDA_ENV_PREFIX"
+    "$CONDA_BIN" run --no-capture-output --prefix "$CONDA_ENV_PREFIX" "$@"
   else
-    printf '%s\n' --name "$CONDA_ENV_NAME"
+    "$CONDA_BIN" run --no-capture-output --name "$CONDA_ENV_NAME" "$@"
   fi
 }
 
-run_in_env() {
-  local -a target
-  mapfile -t target < <(conda_target_args)
-  "$CONDA_BIN" run --no-capture-output "${target[@]}" "$@"
-}
-
 exec_in_env() {
-  local -a target
-  mapfile -t target < <(conda_target_args)
-  exec "$CONDA_BIN" run --no-capture-output "${target[@]}" "$@"
+  if [[ -n "$CONDA_ENV_PREFIX" ]]; then
+    exec "$CONDA_BIN" run --no-capture-output --prefix "$CONDA_ENV_PREFIX" "$@"
+  else
+    exec "$CONDA_BIN" run --no-capture-output --name "$CONDA_ENV_NAME" "$@"
+  fi
 }
 
 environment_exists() {
